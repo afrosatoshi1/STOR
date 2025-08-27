@@ -1,109 +1,116 @@
-const express = require('express');
-const session = require('express-session');
-const bodyParser = require('body-parser');
-const fs = require('fs');
-const path = require('path');
+// server.js
+const express = require("express");
+const session = require("express-session");
+const path = require("path");
+const bodyParser = require("body-parser");
+
 const app = express();
-const DATA_FILE = path.join(__dirname, 'data', 'db.json');
 const PORT = process.env.PORT || 3000;
 
+// ===== Middleware =====
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, 'public')));
-app.set('trust proxy', 1);
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'stor_secret_key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: false }
-}));
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "public")));
 
-function readDB(){
-  if(!fs.existsSync(DATA_FILE)){
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ users: [], products: [] }, null, 2));
+app.use(
+  session({
+    secret: "stor-secret",
+    resave: false,
+    saveUninitialized: false,
+  })
+);
+
+// ===== In-memory "DB" =====
+let users = [
+  { email: "admin@stor.com", password: "admin123", role: "admin" },
+];
+let products = [
+  { id: 1, name: "iPhone 15", price: 1200, category: "Phones" },
+  { id: 2, name: "MacBook Pro", price: 2500, category: "Computers" },
+];
+let carts = {}; // { userEmail: [ {productId, qty} ] }
+
+// ===== Auth Routes =====
+app.post("/api/register", (req, res) => {
+  const { email, password } = req.body;
+  if (users.find((u) => u.email === email)) {
+    return res.status(400).json({ message: "User already exists" });
   }
-  return JSON.parse(fs.readFileSync(DATA_FILE));
-}
-function writeDB(db){
-  fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
-}
-
-// Ensure default admin exists
-(function ensureAdmin(){
-  const db = readDB();
-  if(!db.users.find(u=>u.username==='admin')){
-    db.users.push({ id: 1, username: 'admin', password: 'admin123', role: 'admin' });
-    writeDB(db);
-    console.log('Seeded admin: admin / admin123');
-  }
-})();
-
-// Auth routes
-app.post('/api/register', (req,res)=>{
-  const { username, password } = req.body;
-  if(!username || !password) return res.status(400).json({ message: 'Missing fields' });
-  const db = readDB();
-  if(db.users.find(u=>u.username===username)) return res.status(400).json({ message: 'User exists' });
-  const id = Date.now();
-  db.users.push({ id, username, password, role: 'user' });
-  writeDB(db);
-  req.session.user = { id, username, role: 'user' };
-  res.json({ message: 'Registered', user: req.session.user });
+  users.push({ email, password, role: "user" });
+  res.json({ message: "Registered successfully" });
 });
 
-app.post('/api/login', (req,res)=>{
-  const { username, password } = req.body;
-  const db = readDB();
-  const user = db.users.find(u=>u.username===username && u.password===password);
-  if(!user) return res.status(401).json({ message: 'Invalid credentials' });
-  req.session.user = { id: user.id, username: user.username, role: user.role };
-  res.json({ message: 'Logged in', user: req.session.user });
+app.post("/api/login", (req, res) => {
+  const { email, password } = req.body;
+  const user = users.find(
+    (u) => u.email === email && u.password === password
+  );
+  if (!user) return res.status(401).json({ message: "Invalid credentials" });
+
+  req.session.user = { email: user.email, role: user.role };
+  res.json({ message: "Login successful", user: req.session.user });
 });
 
-app.post('/api/logout', (req,res)=>{
-  req.session.destroy(()=> res.json({ message: 'Logged out' }));
+app.post("/api/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.json({ message: "Logged out" });
+  });
 });
 
-app.get('/api/me', (req,res)=>{
+app.get("/api/session", (req, res) => {
   res.json({ user: req.session.user || null });
 });
 
-// Middleware
-function requireAuth(req,res,next){
-  if(!req.session.user) return res.status(401).json({ message: 'Login required' });
-  next();
-}
-function requireAdmin(req,res,next){
-  if(!req.session.user || req.session.user.role !== 'admin') return res.status(403).json({ message: 'You must be admin to manage products' });
-  next();
-}
-
-// Products endpoints
-app.get('/api/products', (req,res)=>{
-  const db = readDB();
-  res.json(db.products || []);
+// ===== Product Routes =====
+app.get("/api/products", (req, res) => {
+  res.json(products);
 });
 
-app.post('/api/products', requireAdmin, (req,res)=>{
-  const { name, price, category, image } = req.body;
-  if(!name || !price) return res.status(400).json({ message: 'Missing name or price' });
-  const db = readDB();
-  const product = { id: Date.now(), name, price: Number(price), category: category||'General', image: image||'' };
-  db.products.push(product);
-  writeDB(db);
-  res.json({ message: 'Product added', product });
-});
-
-// Serve admin page only to admin (protect at server level)
-app.get('/admin', (req,res)=>{
-  if(!req.session.user || req.session.user.role !== 'admin') return res.redirect('/');
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
-app.get('/admin', (req, res) => {
-  if (!req.session.user || req.session.user.role !== 'admin') {
+app.post("/api/products", (req, res) => {
+  if (!req.session.user || req.session.user.role !== "admin") {
     return res.status(403).json({ message: "You must be admin to manage products" });
   }
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+  const { name, price, category } = req.body;
+  const newProduct = { id: Date.now(), name, price, category };
+  products.push(newProduct);
+  res.json(newProduct);
 });
 
-// Start
-app.listen(PORT, ()=> console.log('Server listening on port', PORT));
+app.delete("/api/products/:id", (req, res) => {
+  if (!req.session.user || req.session.user.role !== "admin") {
+    return res.status(403).json({ message: "You must be admin to manage products" });
+  }
+  const id = parseInt(req.params.id);
+  products = products.filter((p) => p.id !== id);
+  res.json({ message: "Product deleted" });
+});
+
+// ===== Cart Routes =====
+app.get("/api/cart", (req, res) => {
+  if (!req.session.user) return res.status(401).json({ message: "Login required" });
+  res.json(carts[req.session.user.email] || []);
+});
+
+app.post("/api/cart", (req, res) => {
+  if (!req.session.user) return res.status(401).json({ message: "Login required" });
+  const { productId, qty } = req.body;
+  if (!carts[req.session.user.email]) carts[req.session.user.email] = [];
+  carts[req.session.user.email].push({ productId, qty });
+  res.json({ message: "Added to cart" });
+});
+
+// ===== Admin Page =====
+app.get("/admin", (req, res) => {
+  if (!req.session.user || req.session.user.role !== "admin") {
+    return res.status(403).send("You must be admin to manage products");
+  }
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+
+// ===== Catch-all: Send index.html =====
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// ===== Start Server =====
+app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
