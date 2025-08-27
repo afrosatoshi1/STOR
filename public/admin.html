@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Admin - STOR</title>
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+<header class="navbar">
+  <div class="logo">Admin Panel</div>
+  <div><button class="btn" onclick="logout()">Logout</button></div>
+</header>
+
+<main style="padding:18px;">
+  <h2>Manage Products</h2>
+  <form id="productForm" style="display:flex;gap:8px;flex-wrap:wrap;">
+    <input name="name" placeholder="Name" required />
+    <input name="price" type="number" placeholder="Price" required />
+    <input name="category" placeholder="Category" required />
+    <input name="image" placeholder="Image URL (optional)" />
+    <button class="btn" type="submit">Add Product</button>
+  </form>
+
+  <h3 style="margin-top:18px;">Products</h3>
+  <ul id="productList"></ul>
+</main>
+
+<script>
+async function loadAdminProducts(){
+  const res = await fetch('/api/products', { credentials: 'include' });
+  if(!res.ok){
+    alert('You must be admin to manage products');
+    window.location.href = '/';
+    return;
+  }
+  const products = await res.json();
+  const list = document.getElementById('productList');
+  list.innerHTML = '';
+  products.forEach(p => {
+    const li = document.createElement('li');
+    li.textContent = `${p.name} - ₦${p.price} (${p.category})`;
+    list.appendChild(li);
+  });
+}
+document.getElementById('productForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.target;
+  const body = { name: f.name.value, price: f.price.value, category: f.category.value, image: f.image.value };
+  const res = await fetch('/api/products', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body), credentials:'include' });
+  if(res.ok){ f.reset(); loadAdminProducts(); }
+  else { alert('Error adding product'); }
+});
+function logout(){ fetch('/api/logout', { method:'POST', credentials:'include'}).then(()=> window.location.href='/'); }
+loadAdminProducts();
+</script>
+</body>
+</html>

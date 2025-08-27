@@ -1,0 +1,11 @@
+body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f4f6fb;color:#111}
+.navbar{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:#0b2545;color:#fff}
+.logo{font-weight:800}
+.nav-right button{margin-left:8px}
+.hero{padding:48px;text-align:center;background:linear-gradient(135deg,#0b2545,#16488a);color:#fff}
+.product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;padding:18px}
+.product-card{background:#fff;border-radius:12px;padding:12px;box-shadow:0 6px 18px rgba(11,37,69,0.08)}
+.btn{background:#1e5ef8;color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center}
+.modal-content{background:#fff;padding:18px;border-radius:10px;width:320px;max-width:90%}
+.footer{padding:20px;text-align:center;background:#0b2545;color:#fff;margin-top:30px}

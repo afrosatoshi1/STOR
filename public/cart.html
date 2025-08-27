@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Cart - STOR</title>
+<link rel="stylesheet" href="/css/styles.css"></head>
+<body>
+<header class="navbar"><div class="logo">STOR</div><div><button class="btn" onclick="window.location.href='/'">Back</button></div></header>
+<main style="padding:18px;">
+  <h2>Your Cart</h2>
+  <div id="cartGrid" class="product-grid"></div>
+  <div style="margin-top:12px;">
+    <strong>Total: ₦<span id="cartTotal">0</span></strong><br/><br/>
+    <button class="btn" id="payBtn">Pay with Paystack</button>
+  </div>
+</main>
+<script src="https://js.paystack.co/v1/inline.js"></script>
+<script>
+// cart functions rely on localStorage 'cart'
+function renderCart(){
+  const cart = JSON.parse(localStorage.getItem('cart')||'[]');
+  const grid = document.getElementById('cartGrid');
+  grid.innerHTML = '';
+  let total = 0;
+  cart.forEach((c,i)=>{
+    total += Number(c.price) * (c.qty||1);
+    const div = document.createElement('div');
+    div.className = 'product-card';
+    div.innerHTML = `<h4>${c.name}</h4><p>₦${c.price}</p><p>Qty: ${c.qty||1}</p><button onclick="remove(${i})" class="btn">Remove</button>`;
+    grid.appendChild(div);
+  });
+  document.getElementById('cartTotal').textContent = total;
+}
+function remove(i){ const cart=JSON.parse(localStorage.getItem('cart')||'[]'); cart.splice(i,1); localStorage.setItem('cart', JSON.stringify(cart)); renderCart(); }
+document.getElementById('payBtn').addEventListener('click', ()=>{
+  const cart = JSON.parse(localStorage.getItem('cart')||'[]');
+  if(cart.length===0){ alert('Cart empty'); return; }
+  // Paystack example - replace key
+  const total = cart.reduce((s,c)=>s+Number(c.price)*(c.qty||1),0)*100;
+  const handler = PaystackPop.setup({
+    key: 'YOUR_PAYSTACK_PUBLIC_KEY',
+    email: 'customer@example.com',
+    amount: Math.round(total),
+    currency: 'NGN',
+    callback: function(resp){ alert('Payment success: '+resp.reference); localStorage.removeItem('cart'); renderCart(); },
+    onClose: function(){ alert('Payment cancelled'); }
+  });
+  handler.openIframe();
+});
+renderCart();
+</script>
+</body>
+</html>
