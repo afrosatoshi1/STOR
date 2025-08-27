@@ -98,6 +98,12 @@ app.get('/admin', (req,res)=>{
   if(!req.session.user || req.session.user.role !== 'admin') return res.redirect('/');
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
+app.get('/admin', (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'admin') {
+    return res.status(403).json({ message: "You must be admin to manage products" });
+  }
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
 
 // Start
 app.listen(PORT, ()=> console.log('Server listening on port', PORT));
